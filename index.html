@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام إدارة شفتات وحسابات العيادة</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap');
+        body { font-family: 'Cairo', sans-serif; }
+    </style>
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyB_tJNChNTT2pgvmSZY0hPTP_wFAnnzeBM",
+            authDomain: "clinic-b8cb2.firebaseapp.com",
+            projectId: "clinic-b8cb2",
+            storageBucket: "clinic-b8cb2.firebasestorage.app",
+            messagingSenderId: "711800114452",
+            appId: "1:711800114452:web:c76d9056fc483c011e0601"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // Expose functions globally to use in app
+        window.FB_db = db;
+        window.FB_collection = collection;
+        window.FB_addDoc = addDoc;
+        window.FB_getDocs = getDocs;
+        window.FB_deleteDoc = deleteDoc;
+        window.FB_doc = doc;
+        window.FB_setDoc = setDoc;
+
+        // Trigger initial data load
+        if(window.initAppFromFirebase) {
+            window.initAppFromFirebase();
+        }
+    </script>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="bg-indigo-700 text-white shadow-md">
+        <div class="container mx-auto px-4 py-4 flex flex-col md:flex-row justify-between items-center">
+            <div class="flex items-center space-x-3 space-x-reverse mb-3 md:mb-0">
+                <div class="bg-white text-indigo-700 p-2.5 rounded-xl shadow">
+                    <i class="fa-solid fa-cash-register text-2xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-black">حسابات شفتات العيادة (أونلاين)</h1>
+                    <p class="text-xs text-indigo-200">مزامنة فورية بين جميع الأجهزة والتلفونات</p>
+                </div>
+            </div>
+            <!-- Month Filter -->
+            <div class="flex items-center space-x-2 space-x-reverse bg-indigo-800 px-4 py-2 rounded-xl">
+                <label for="globalMonth" class="text-sm font-semibold text-indigo-200">شهر الحساب:</label>
+                <input type="month" id="globalMonth" class="bg-indigo-900 text-white px-3 py-1 rounded-lg border border-indigo-600 focus:outline-none focus:ring-2 focus:ring-white">
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="container mx-auto px-4 py-6 flex-grow space-y-6">
+
+        <!-- Quick Stats Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between">
+                <div>
+                    <p class="text-xs text-slate-500 font-bold mb-1">إجمالي إيرادات الشفتات</p>
+                    <h3 id="statShifts" class="text-2xl font-black text-emerald-600">0 ج.م</h3>
+                </div>
+                <div class="bg-emerald-50 text-emerald-600 p-3.5 rounded-xl">
+                    <i class="fa-solid fa-arrow-trend-up text-xl"></i>
+                </div>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between">
+                <div>
+                    <p class="text-xs text-slate-500 font-bold mb-1">إجمالي المصروفات</p>
+                    <h3 id="statExpenses" class="text-2xl font-black text-rose-600">0 ج.م</h3>
+                </div>
+                <div class="bg-rose-50 text-rose-600 p-3.5 rounded-xl">
+                    <i class="fa-solid fa-receipt text-xl"></i>
+                </div>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between">
+                <div>
+                    <p class="text-xs text-slate-500 font-bold mb-1">إجمالي المرتبات</p>
+                    <h3 id="statSalaries" class="text-2xl font-black text-amber-600">0 ج.م</h3>
+                </div>
+                <div class="bg-amber-50 text-amber-600 p-3.5 rounded-xl">
+                    <i class="fa-solid fa-wallet text-xl"></i>
+                </div>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between">
+                <div>
+                    <p class="text-xs text-slate-500 font-bold mb-1">صافي الربح الشهري</p>
+                    <h3 id="statNetProfit" class="text-2xl font-black text-indigo-600">0 ج.م</h3>
+                </div>
+                <div class="bg-indigo-50 text-indigo-600 p-3.5 rounded-xl">
+                    <i class="fa-solid fa-scale-balanced text-xl"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabs Navigation -->
+        <div class="flex border-b border-slate-200 overflow-x-auto space-x-2 space-x-reverse">
+            <button onclick="switchTab('shifts')" id="btnTabShifts" class="tab-btn px-6 py-3 font-bold border-b-2 border-indigo-600 text-indigo-600 whitespace-nowrap transition">
+                <i class="fa-solid fa-clock-rotate-left ml-2"></i> إغلاق الشفتات
+            </button>
+            <button onclick="switchTab('expenses')" id="btnTabExpenses" class="tab-btn px-6 py-3 font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-700 whitespace-nowrap transition">
+                <i class="fa-solid fa-file-invoice-dollar ml-2"></i> جدول المصروفات 
+            </button>
+            <button onclick="switchTab('salaries')" id="btnTabSalaries" class="tab-btn px-6 py-3 font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-700 whitespace-nowrap transition">
+                <i class="fa-solid fa-users-gear ml-2"></i> المرتبات
+            </button>
+            <button onclick="switchTab('dailyClosing')" id="btnTabDailyClosing" class="tab-btn px-6 py-3 font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-700 whitespace-nowrap transition text-indigo-700">
+                <i class="fa-solid fa-calendar-check ml-2"></i> سجل التقفيل اليومي 
+            </button>
+        </div>
+
+        <!-- Tab 1: Shifts -->
+        <div id="tabShifts" class="tab-content space-y-6">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                <h2 class="text-lg font-bold mb-4 text-slate-700 flex items-center">
+                    <i class="fa-solid fa-plus-circle text-indigo-600 ml-2"></i> تسجيل حصيلة شفت جديد
+                </h2>
+                <form id="shiftForm" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">التاريخ</label>
+                        <input type="date" id="shiftDate" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">الشفت</label>
+                        <select id="shiftName" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <option value="صباحي">الشفت الصباحي</option>
+                            <option value="مسائي">الشفت المسائي</option>
+                            <option value="ليلي">الشفت الليلي</option>
+                            <option value="لونج">شفت لونج (Long)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">المبلغ المحصل (ج.م)</label>
+                        <input type="number" id="shiftAmount" placeholder="0.00" step="0.01" min="0" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                    <div>
+                        <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-xl shadow transition">
+                            <i class="fa-solid fa-save ml-1"></i> حفظ الشفت
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                <div class="p-4 bg-slate-50 border-b border-slate-100 font-bold text-slate-700">شفتات الشهر المحدد</div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-right text-sm">
+                        <thead class="bg-slate-100 text-slate-600 text-xs">
+                            <tr>
+                                <th class="p-3">التاريخ</th>
+                                <th class="p-3">الشفت</th>
+                                <th class="p-3">المبلغ</th>
+                                <th class="p-3 text-center">إجراءات</th>
+                            </tr>
+                        </thead>
+                        <tbody id="shiftsTableBody" class="divide-y divide-slate-100"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 2: Expenses (Excel Style) -->
+        <div id="tabExpenses" class="tab-content hidden space-y-6">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-6">
+                <div class="flex flex-col md:flex-row justify-between items-center gap-4 border-b pb-4">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-700 flex items-center">
+                            <i class="fa-solid fa-table text-rose-600 ml-2"></i> تسجيل المصروفات (سجل التاريخ واكتب المبالغ مباشرة)
+                        </h2>
+                        <p class="text-xs text-slate-500">اختر التاريخ، ثم اكتب المبلغ أمام كل بند، واضغط حفظ.</p>
+                    </div>
+                    <div class="flex items-center space-x-3 space-x-reverse">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">تاريخ المصروفات</label>
+                            <input type="date" id="expenseDate" class="bg-slate-50 border border-slate-300 rounded-xl px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-500">
+                        </div>
+                        <button onclick="openCategoryModal()" class="mt-5 text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-xl font-semibold transition">
+                            <i class="fa-solid fa-plus ml-1"></i> إضافة بند جديد
+                        </button>
+                    </div>
+                </div>
+
+                <form id="excelExpenseForm" class="space-y-4">
+                    <div id="excelInputsGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4"></div>
+                    <div class="pt-2 flex justify-end">
+                        <button type="submit" class="bg-rose-600 hover:bg-rose-700 text-white font-bold py-2.5 px-6 rounded-xl shadow transition">
+                            <i class="fa-solid fa-save ml-1"></i> حفظ مصروفات هذا التاريخ
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-4">
+                <h3 class="font-bold text-slate-700 text-md flex items-center">
+                    <i class="fa-solid fa-chart-pie text-rose-600 ml-2"></i> إجمالي كل بند مصروفات خلال الشهر الحالي
+                </h3>
+                <div id="categoryTotalsGrid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3"></div>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                <div class="p-4 bg-slate-50 border-b border-slate-100 font-bold text-slate-700">سجل مصروفات الشهر المحدد</div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-right text-sm">
+                        <thead class="bg-slate-100 text-slate-600 text-xs">
+                            <tr>
+                                <th class="p-3">التاريخ</th>
+                                <th class="p-3">البند</th>
+                                <th class="p-3">المبلغ</th>
+                                <th class="p-3 text-center">إجراءات</th>
+                            </tr>
+                        </thead>
+                        <tbody id="expensesTableBody" class="divide-y divide-slate-100"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 3: Salaries -->
+        <div id="tabSalaries" class="tab-content hidden space-y-6">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                <h2 class="text-lg font-bold mb-4 text-slate-700 flex items-center">
+                    <i class="fa-solid fa-plus-circle text-amber-600 ml-2"></i> تسجيل المرتبات
+                </h2>
+                <form id="salaryForm" class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">التاريخ</label>
+                        <input type="date" id="salaryDate" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">المبلغ (ج.م)</label>
+                        <input type="number" id="salaryAmount" placeholder="5000" step="0.01" min="0" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
+                    </div>
+                    <div>
+                        <button type="submit" class="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-2 px-4 rounded-xl shadow transition">
+                            <i class="fa-solid fa-save ml-1"></i> حفظ المرتب
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                <div class="p-4 bg-slate-50 border-b border-slate-100 font-bold text-slate-700">مرتبات الشهر المحدد</div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-right text-sm">
+                        <thead class="bg-slate-100 text-slate-600 text-xs">
+                            <tr>
+                                <th class="p-3">التاريخ</th>
+                                <th class="p-3">المبلغ</th>
+                                <th class="p-3 text-center">إجراءات</th>
+                            </tr>
+                        </thead>
+                        <tbody id="salariesTableBody" class="divide-y divide-slate-100"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 4: Daily Closing Record -->
+        <div id="tabDailyClosing" class="tab-content hidden space-y-6">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4">
+                <div>
+                    <h2 class="text-lg font-bold text-slate-700 flex items-center">
+                        <i class="fa-solid fa-calendar-check text-indigo-600 ml-2"></i> التقفيل اليومي للحسابات
+                    </h2>
+                    <p class="text-xs text-slate-500">اختر التاريخ الذي تريد تقفيله لمراجعة ملخص إيراداته ومصروفاته لاحقاً.</p>
+                </div>
+                <div class="flex items-center space-x-3 space-x-reverse">
+                    <input type="date" id="closingDateInput" class="bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <button onclick="performDailyClosing()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-5 rounded-xl shadow transition text-sm">
+                        <i class="fa-solid fa-lock ml-1"></i> اعتماد وتقفيل هذا اليوم
+                    </button>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                <div class="p-4 bg-slate-50 border-b border-slate-100 font-bold text-slate-700">سجل الأيام المقفلة</div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-right text-sm">
+                        <thead class="bg-slate-100 text-slate-600 text-xs">
+                            <tr>
+                                <th class="p-3">التاريخ</th>
+                                <th class="p-3">إيرادات الشفتات</th>
+                                <th class="p-3">المصروفات</th>
+                                <th class="p-3">المرتبات</th>
+                                <th class="p-3">صافي يومية اليوم</th>
+                                <th class="p-3 text-center">إجراءات</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dailyClosingTableBody" class="divide-y divide-slate-100"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Modal for Managing Expense Categories -->
+    <div id="categoryModal" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-xl">
+            <div class="flex justify-between items-center border-b pb-3">
+                <h3 class="font-bold text-lg text-slate-800">إدارة بنود المصروفات الأساسية</h3>
+                <button onclick="closeCategoryModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+            <div class="space-y-3">
+                <div class="flex space-x-2 space-x-reverse">
+                    <input type="text" id="newCategoryInput" placeholder="أدخل اسم البند (مثلاً: إنترنت)" class="flex-grow bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <button onclick="addCategory()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-sm font-semibold transition">إضافة</button>
+                </div>
+                <div class="max-h-48 overflow-y-auto divide-y divide-slate-100 border rounded-xl p-2" id="categoriesList"></div>
+            </div>
+            <div class="text-center pt-2">
+                <button onclick="closeCategoryModal()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-5 py-2 rounded-xl text-sm font-bold transition">إغلاق</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500 mt-auto">
+        مرتبط بقاعدة بيانات Firebase أونلاين • نظام إدارة عيادتك بكل سهولة
+    </footer>
+
+    <!-- JavaScript Application Logic -->
+    <script>
+        let dbState = {
+            shifts: [],
+            expenses: [],
+            salaries: [],
+            dailyClosings: [],
+            expenseCategories: ['كهربا', 'صيانة', 'مياه', 'نور', 'إيجار', 'أدوات طبية']
+        };
+
+        async function loadDataFromFirebase() {
+            if(!window.FB_db) return;
+            try {
+                const querySnapshot = await window.FB_getDocs(window.FB_collection(window.FB_db, "clinic_data"));
+                querySnapshot.forEach((docSnap) => {
+                    const data = docSnap.data();
+                    if(data && data.payload) {
+                        dbState = data.payload;
+                    }
+                });
+                if(!dbState.expenseCategories) dbState.expenseCategories = ['كهربا', 'صيانة', 'مياه', 'نور', 'إيجار', 'أدوات طبية'];
+                if(!dbState.dailyClosings) dbState.dailyClosings = [];
+                render();
+            } catch (e) {
+                console.error("Error loading from firebase:", e);
+            }
+        }
+
+        async function saveFirebaseData() {
+            if(!window.FB_db) return;
+            try {
+                await window.FB_setDoc(window.FB_doc(window.FB_db, "clinic_data", "main_db"), {
+                    payload: dbState
+                });
+            } catch (e) {
+                console.error("Error saving to firebase:", e);
+            }
+        }
+
+        window.initAppFromFirebase = function() {
+            loadDataFromFirebase();
+        }
+
+        function saveData() {
+            saveFirebaseData();
+            render();
+        }
+
+        const today = new Date();
+        const currentYearMonth = today.toISOString().slice(0, 7);
+        const globalMonthInput = document.getElementById('globalMonth');
+        globalMonthInput.value = currentYearMonth;
+
+        const todayStr = today.toISOString().slice(0, 10);
+        document.getElementById('shiftDate').value = todayStr;
+        document.getElementById('expenseDate').value = todayStr;
+        document.getElementById('salaryDate').value = todayStr;
+        document.getElementById('closingDateInput').value = todayStr;
+
+        globalMonthInput.addEventListener('change', render);
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('border-indigo-600', 'text-indigo-600');
+                btn.classList.add('border-transparent', 'text-slate-500');
+            });
+
+            if(tabName === 'shifts') {
+                document.getElementById('tabShifts').classList.remove('hidden');
+                document.getElementById('btnTabShifts').classList.add('border-indigo-600', 'text-indigo-600');
+                document.getElementById('btnTabShifts').classList.remove('border-transparent', 'text-slate-500');
+            } else if(tabName === 'expenses') {
+                document.getElementById('tabExpenses').classList.remove('hidden');
+                document.getElementById('btnTabExpenses').classList.add('border-indigo-600', 'text-indigo-600');
+                document.getElementById('btnTabExpenses').classList.remove('border-transparent', 'text-slate-500');
+            } else if(tabName === 'salaries') {
+                document.getElementById('tabSalaries').classList.remove('hidden');
+                document.getElementById('btnTabSalaries').classList.add('border-indigo-600', 'text-indigo-600');
+                document.getElementById('btnTabSalaries').classList.remove('border-transparent', 'text-slate-500');
+            } else if(tabName === 'dailyClosing') {
+                document.getElementById('tabDailyClosing').classList.remove('hidden');
+                document.getElementById('btnTabDailyClosing').classList.add('border-indigo-600', 'text-indigo-600');
+                document.getElementById('btnTabDailyClosing').classList.remove('border-transparent', 'text-slate-500');
+            }
+        }
+
+        // Category Modal Functions
+        function openCategoryModal() {
+            renderCategoriesList();
+            document.getElementById('categoryModal').classList.remove('hidden');
+        }
+
+        function closeCategoryModal() {
+            document.getElementById('categoryModal').classList.add('hidden');
+            renderExcelInputs();
+            renderCategoryTotals();
+        }
+
+        function addCategory() {
+            const input = document.getElementById('newCategoryInput');
+            const val = input.value.trim();
+            if(val && !dbState.expenseCategories.includes(val)) {
+                dbState.expenseCategories.push(val);
+                input.value = '';
+                saveData();
+                renderCategoriesList();
+            }
+        }
+
+        function deleteCategory(cat) {
+            if(confirm(`هل أنت متأكد من حذف البند "${cat}"؟`)) {
+                dbState.expenseCategories = dbState.expenseCategories.filter(c => c !== cat);
+                saveData();
+                renderCategoriesList();
+            }
+        }
+
+        function renderCategoriesList() {
+            const listContainer = document.getElementById('categoriesList');
+            listContainer.innerHTML = '';
+            dbState.expenseCategories.forEach(cat => {
+                listContainer.innerHTML += `
+                    <div class="flex justify-between items-center py-2 px-1 text-sm">
+                        <span class="font-semibold text-slate-700">${cat}</span>
+                        <button onclick="deleteCategory('${cat}')" class="text-rose-500 hover:text-rose-700"><i class="fa-solid fa-trash text-xs"></i></button>
+                    </div>
+                `;
+            });
+        }
+
+        function renderExcelInputs() {
+            const grid = document.getElementById('excelInputsGrid');
+            grid.innerHTML = '';
+            dbState.expenseCategories.forEach(cat => {
+                grid.innerHTML += `
+                    <div class="bg-slate-50 border border-slate-200 p-3 rounded-xl flex flex-col justify-between">
+                        <label class="text-xs font-bold text-slate-700 mb-1.5 flex items-center">
+                            <i class="fa-solid fa-tag text-rose-500 ml-1.5"></i> ${cat}
+                        </label>
+                        <input type="number" data-category="${cat}" placeholder="0.00" step="0.01" min="0" class="expense-excel-input w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-500">
+                    </div>
+                `;
+            });
+        }
+
+        function renderCategoryTotals() {
+            const selectedMonth = globalMonthInput.value;
+            const filteredExpenses = dbState.expenses.filter(item => item.date && item.date.startsWith(selectedMonth));
+            
+            const totalsGrid = document.getElementById('categoryTotalsGrid');
+            totalsGrid.innerHTML = '';
+
+            dbState.expenseCategories.forEach(cat => {
+                const catTotal = filteredExpenses
+                    .filter(item => item.category === cat)
+                    .reduce((sum, curr) => sum + curr.amount, 0);
+
+                totalsGrid.innerHTML += `
+                    <div class="bg-rose-50/60 border border-rose-100 p-3 rounded-xl flex flex-col justify-between">
+                        <span class="text-xs font-bold text-slate-600 mb-1">${cat}</span>
+                        <span class="text-base font-black text-rose-600">${catTotal.toLocaleString()} ج.م</span>
+                    </div>
+                `;
+            });
+        }
+
+        // Form Submit Listeners
+        document.getElementById('shiftForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            dbState.shifts.push({
+                id: Date.now(),
+                date: document.getElementById('shiftDate').value,
+                shift: document.getElementById('shiftName').value,
+                amount: parseFloat(document.getElementById('shiftAmount').value)
+            });
+            saveData();
+            document.getElementById('shiftAmount').value = '';
+        });
+
+        document.getElementById('excelExpenseForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const dateVal = document.getElementById('expenseDate').value;
+            const inputs = document.querySelectorAll('.expense-excel-input');
+            let addedCount = 0;
+
+            inputs.forEach(input => {
+                const amount = parseFloat(input.value);
+                if(amount > 0) {
+                    dbState.expenses.push({
+                        id: Date.now() + Math.random(),
+                        date: dateVal,
+                        category: input.getAttribute('data-category'),
+                        amount: amount
+                    });
+                    addedCount++;
+                    input.value = '';
+                }
+            });
+
+            if(addedCount > 0) {
+                saveData();
+                alert('تم حفظ المصروفات أونلاين بنجاح!');
+            } else {
+                alert('الرجاء إدخال مبلغ واحد على الأقل في أحد البنود.');
+            }
+        });
+
+        document.getElementById('salaryForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            dbState.salaries.push({
+                id: Date.now(),
+                date: document.getElementById('salaryDate').value,
+                amount: parseFloat(document.getElementById('salaryAmount').value)
+            });
+            saveData();
+            document.getElementById('salaryAmount').value = '';
+        });
+
+        function performDailyClosing() {
+            const dateVal = document.getElementById('closingDateInput').value;
+            if(!dateVal) {
+                alert('الرجاء اختيار تاريخ التقفيل.');
+                return;
+            }
+
+            const dayShifts = dbState.shifts.filter(item => item.date === dateVal).reduce((acc, curr) => acc + curr.amount, 0);
+            const dayExpenses = dbState.expenses.filter(item => item.date === dateVal).reduce((acc, curr) => acc + curr.amount, 0);
+            const daySalaries = dbState.salaries.filter(item => item.date === dateVal).reduce((acc, curr) => acc + curr.amount, 0);
+            const dayNet = dayShifts - (dayExpenses + daySalaries);
+
+            const existingIndex = dbState.dailyClosings.findIndex(item => item.date === dateVal);
+            const closingObj = {
+                id: existingIndex >= 0 ? dbState.dailyClosings[existingIndex].id : Date.now(),
+                date: dateVal,
+                shifts: dayShifts,
+                expenses: dayExpenses,
+                salaries: daySalaries,
+                net: dayNet
+            };
+
+            if(existingIndex >= 0) {
+                dbState.dailyClosings[existingIndex] = closingObj;
+                alert(`تم تحديث تقفيل يوم ${dateVal} بنجاح!`);
+            } else {
+                dbState.dailyClosings.push(closingObj);
+                alert(`تم اعتماد وتقفيل يوم ${dateVal} بنجاح!`);
+            }
+
+            saveData();
+        }
+
+        function deleteItem(type, id) {
+            if(confirm('هل أنت متأكد من حذف هذا العنصر؟')) {
+                dbState[type] = dbState[type].filter(item => item.id !== id);
+                saveData();
+            }
+        }
+
+        function render() {
+            renderExcelInputs();
+            renderCategoryTotals();
+            const selectedMonth = globalMonthInput.value;
+
+            const filteredShifts = dbState.shifts.filter(item => item.date && item.date.startsWith(selectedMonth));
+            const filteredExpenses = dbState.expenses.filter(item => item.date && item.date.startsWith(selectedMonth));
+            const filteredSalaries = dbState.salaries.filter(item => item.date && item.date.startsWith(selectedMonth));
+            const filteredClosings = dbState.dailyClosings.filter(item => item.date && item.date.startsWith(selectedMonth));
+
+            const totalShifts = filteredShifts.reduce((acc, curr) => acc + curr.amount, 0);
+            const totalExpenses = filteredExpenses.reduce((acc, curr) => acc + curr.amount, 0);
+            const totalSalaries = filteredSalaries.reduce((acc, curr) => acc + curr.amount, 0);
+            const netProfit = totalShifts - (totalExpenses + totalSalaries);
+
+            document.getElementById('statShifts').innerText = totalShifts.toLocaleString() + ' ج.م';
+            document.getElementById('statExpenses').innerText = totalExpenses.toLocaleString() + ' ج.م';
+            document.getElementById('statSalaries').innerText = totalSalaries.toLocaleString() + ' ج.م';
+            
+            const netProfitEl = document.getElementById('statNetProfit');
+            netProfitEl.innerText = netProfit.toLocaleString() + ' ج.م';
+            netProfitEl.className = netProfit >= 0 ? "text-2xl font-black text-indigo-600" : "text-2xl font-black text-rose-600";
+
+            // Shifts Table
+            const shiftsTbody = document.getElementById('shiftsTableBody');
+            shiftsTbody.innerHTML = filteredShifts.length === 0 ? `<tr><td colspan="4" class="p-4 text-center text-slate-400">لا توجد شفتات مسجلة في هذا الشهر</td></tr>` : '';
+            filteredShifts.sort((a,b) => new Date(b.date) - new Date(a.date)).forEach(item => {
+                shiftsTbody.innerHTML += `
+                    <tr class="hover:bg-slate-50">
+                        <td class="p-3">${item.date}</td>
+                        <td class="p-3 font-semibold text-indigo-700">شفت ${item.shift}</td>
+                        <td class="p-3 font-bold text-emerald-600">${item.amount.toLocaleString()} ج.م</td>
+                        <td class="p-3 text-center">
+                            <button onclick="deleteItem('shifts', ${item.id})" class="text-rose-500 hover:text-rose-700 p-1"><i class="fa-solid fa-trash"></i></button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            // Expenses Table
+            const expensesTbody = document.getElementById('expensesTableBody');
+            expensesTbody.innerHTML = filteredExpenses.length === 0 ? `<tr><td colspan="4" class="p-4 text-center text-slate-400">لا توجد مصروفات مسجلة في هذا الشهر</td></tr>` : '';
+            filteredExpenses.sort((a,b) => new Date(b.date) - new Date(a.date)).forEach(item => {
+                expensesTbody.innerHTML += `
+                    <tr class="hover:bg-slate-50">
+                        <td class="p-3">${item.date}</td>
+                        <td class="p-3 font-semibold text-rose-700">${item.category}</td>
+                        <td class="p-3 font-bold text-rose-600">${item.amount.toLocaleString()} ج.م</td>
+                        <td class="p-3 text-center">
+                            <button onclick="deleteItem('expenses', ${item.id})" class="text-rose-500 hover:text-rose-700 p-1"><i class="fa-solid fa-trash"></i></button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            // Salaries Table
+            const salariesTbody = document.getElementById('salariesTableBody');
+            salariesTbody.innerHTML = filteredSalaries.length === 0 ? `<tr><td colspan="3" class="p-4 text-center text-slate-400">لا توجد مرتبات مسجلة في هذا الشهر</td></tr>` : '';
+            filteredSalaries.sort((a,b) => new Date(b.date) - new Date(a.date)).forEach(item => {
+                salariesTbody.innerHTML += `
+                    <tr class="hover:bg-slate-50">
+                        <td class="p-3">${item.date}</td>
+                        <td class="p-3 font-bold text-amber-600">${item.amount.toLocaleString()} ج.م</td>
+                        <td class="p-3 text-center">
+                            <button onclick="deleteItem('salaries', ${item.id})" class="text-rose-500 hover:text-rose-700 p-1"><i class="fa-solid fa-trash"></i></button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            // Daily Closings Table
+            const closingTbody = document.getElementById('dailyClosingTableBody');
+            closingTbody.innerHTML = filteredClosings.length === 0 ? `<tr><td colspan="6" class="p-4 text-center text-slate-400">لا توجد أيام مقفلة في هذا الشهر حتى الآن</td></tr>` : '';
+            filteredClosings.sort((a,b) => new Date(b.date) - new Date(a.date)).forEach(item => {
+                closingTbody.innerHTML += `
+                    <tr class="hover:bg-slate-50">
+                        <td class="p-3 font-bold text-indigo-700">${item.date}</td>
+                        <td class="p-3 text-emerald-600 font-semibold">${item.shifts.toLocaleString()} ج.م</td>
+                        <td class="p-3 text-rose-600 font-semibold">${item.expenses.toLocaleString()} ج.م</td>
+                        <td class="p-3 text-amber-600 font-semibold">${item.salaries.toLocaleString()} ج.م</td>
+                        <td class="p-3 font-black ${item.net >= 0 ? 'text-indigo-600' : 'text-rose-600'}">${item.net.toLocaleString()} ج.م</td>
+                        <td class="p-3 text-center">
+                            <button onclick="deleteItem('dailyClosings', ${item.id})" class="text-rose-500 hover:text-rose-700 p-1"><i class="fa-solid fa-trash"></i></button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        loadDataFromFirebase();
+    </script>
+</body>
+</html>
