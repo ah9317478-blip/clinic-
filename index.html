@@ -29,7 +29,6 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
-        // Expose functions globally to use in app
         window.FB_db = db;
         window.FB_collection = collection;
         window.FB_addDoc = addDoc;
@@ -38,7 +37,6 @@
         window.FB_doc = doc;
         window.FB_setDoc = setDoc;
 
-        // Trigger initial data load
         if(window.initAppFromFirebase) {
             window.initAppFromFirebase();
         }
@@ -54,8 +52,7 @@
                     <i class="fa-solid fa-cash-register text-2xl"></i>
                 </div>
                 <div>
-                    <h1 class="text-2xl font-black">حسابات شفتات العيادة (أونلاين)</h1>
-                    <p class="text-xs text-indigo-200">مزامنة فورية بين جميع الأجهزة والتلفونات</p>
+                    <h1 class="text-2xl font-black">حسابات شفتات العيادة</h1>
                 </div>
             </div>
             <!-- Month Filter -->
@@ -118,13 +115,13 @@
                 <i class="fa-solid fa-clock-rotate-left ml-2"></i> إغلاق الشفتات
             </button>
             <button onclick="switchTab('expenses')" id="btnTabExpenses" class="tab-btn px-6 py-3 font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-700 whitespace-nowrap transition">
-                <i class="fa-solid fa-file-invoice-dollar ml-2"></i> جدول المصروفات 
+                <i class="fa-solid fa-file-invoice-dollar ml-2"></i> جدول المصروفات (إكسل)
             </button>
             <button onclick="switchTab('salaries')" id="btnTabSalaries" class="tab-btn px-6 py-3 font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-700 whitespace-nowrap transition">
                 <i class="fa-solid fa-users-gear ml-2"></i> المرتبات
             </button>
             <button onclick="switchTab('dailyClosing')" id="btnTabDailyClosing" class="tab-btn px-6 py-3 font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-700 whitespace-nowrap transition text-indigo-700">
-                <i class="fa-solid fa-calendar-check ml-2"></i> سجل التقفيل اليومي 
+                <i class="fa-solid fa-calendar-check ml-2"></i> سجل التقفيل اليومي 📅
             </button>
         </div>
 
@@ -335,7 +332,7 @@
 
     <!-- Footer -->
     <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500 mt-auto">
-        مرتبط بقاعدة بيانات Firebase أونلاين • نظام إدارة عيادتك بكل سهولة
+        نظام إدارة عيادتك بكل سهولة
     </footer>
 
     <!-- JavaScript Application Logic -->
@@ -425,7 +422,6 @@
             }
         }
 
-        // Category Modal Functions
         function openCategoryModal() {
             renderCategoriesList();
             document.getElementById('categoryModal').classList.remove('hidden');
@@ -505,7 +501,6 @@
             });
         }
 
-        // Form Submit Listeners
         document.getElementById('shiftForm').addEventListener('submit', function(e) {
             e.preventDefault();
             dbState.shifts.push({
@@ -620,7 +615,6 @@
             netProfitEl.innerText = netProfit.toLocaleString() + ' ج.م';
             netProfitEl.className = netProfit >= 0 ? "text-2xl font-black text-indigo-600" : "text-2xl font-black text-rose-600";
 
-            // Shifts Table
             const shiftsTbody = document.getElementById('shiftsTableBody');
             shiftsTbody.innerHTML = filteredShifts.length === 0 ? `<tr><td colspan="4" class="p-4 text-center text-slate-400">لا توجد شفتات مسجلة في هذا الشهر</td></tr>` : '';
             filteredShifts.sort((a,b) => new Date(b.date) - new Date(a.date)).forEach(item => {
@@ -636,7 +630,6 @@
                 `;
             });
 
-            // Expenses Table
             const expensesTbody = document.getElementById('expensesTableBody');
             expensesTbody.innerHTML = filteredExpenses.length === 0 ? `<tr><td colspan="4" class="p-4 text-center text-slate-400">لا توجد مصروفات مسجلة في هذا الشهر</td></tr>` : '';
             filteredExpenses.sort((a,b) => new Date(b.date) - new Date(a.date)).forEach(item => {
@@ -652,7 +645,6 @@
                 `;
             });
 
-            // Salaries Table
             const salariesTbody = document.getElementById('salariesTableBody');
             salariesTbody.innerHTML = filteredSalaries.length === 0 ? `<tr><td colspan="3" class="p-4 text-center text-slate-400">لا توجد مرتبات مسجلة في هذا الشهر</td></tr>` : '';
             filteredSalaries.sort((a,b) => new Date(b.date) - new Date(a.date)).forEach(item => {
@@ -667,7 +659,6 @@
                 `;
             });
 
-            // Daily Closings Table
             const closingTbody = document.getElementById('dailyClosingTableBody');
             closingTbody.innerHTML = filteredClosings.length === 0 ? `<tr><td colspan="6" class="p-4 text-center text-slate-400">لا توجد أيام مقفلة في هذا الشهر حتى الآن</td></tr>` : '';
             filteredClosings.sort((a,b) => new Date(b.date) - new Date(a.date)).forEach(item => {
